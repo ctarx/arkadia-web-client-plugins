@@ -18,30 +18,22 @@ function clean(text) {
     .trim();
 }
 
-function withBackground(foregroundState, bgHex) {
-  return {
-    ...foregroundState,
-    background: { space: "hex", color: bgHex },
-  };
-}
-
 function printStunned(target) {
   const name = clean(target).toUpperCase();
   if (!name) return;
 
-  const labelStyle = withBackground(
-    apiRef.colors.fromHex(HEX.white),
-    HEX.violetRed,
-  );
-  const nameStyle = withBackground(
-    apiRef.colors.fromHex(HEX.violetRed),
-    HEX.white,
-  );
+  const labelStyle = {
+    foreground: { space: "hex", color: HEX.white },
+    background: { space: "hex", color: HEX.violetRed },
+  };
+  const nameStyle = {
+    foreground: { space: "hex", color: HEX.violetRed },
+    background: { space: "hex", color: HEX.white },
+  };
 
-  const buffer = new apiRef.AnsiAwareBuffer(
-    "\n\n\t\t\t OGLUSZYLES ",
-    labelStyle,
-  );
+  // First the leading whitespace, unstyled, otherwise the background "bleeds" onto the tabs.
+  const buffer = new apiRef.AnsiAwareBuffer("\n\n\t\t\t");
+  buffer.append(" OGLUSZYLES ", labelStyle);
   buffer.append(` ${name} `, nameStyle);
   buffer.append("\n\n");
 
@@ -52,10 +44,8 @@ function printRecovered(target) {
   const name = clean(target);
   if (!name) return;
 
-  const buffer = new apiRef.AnsiAwareBuffer(
-    "\n\t\t" + name,
-    apiRef.colors.fromHex(HEX.gold),
-  );
+  const buffer = new apiRef.AnsiAwareBuffer("\n\t\t");
+  buffer.append(name, apiRef.colors.fromHex(HEX.gold));
   buffer.append(" dochodzi do siebie", apiRef.colors.fromHex(HEX.cyan));
   buffer.append("\n\n");
 
@@ -85,7 +75,7 @@ export async function init(api) {
 
   return {
     name: "stun-highlighter",
-    version: "1.0.1",
+    version: "1.0.2",
     author: "ctarx",
     description: "Highlights stun and stun recovery messages.",
   };
