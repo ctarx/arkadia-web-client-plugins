@@ -1,19 +1,15 @@
 const TAG = "stun-highlighter";
-
 let apiRef = null;
 
-const C = {
-  reset: "\x1b[0m",
-  white: "\x1b[38;2;255;255;255m",
-  violetRed: "\x1b[38;2;208;32;144m",
-  violetRedBg: "\x1b[48;2;208;32;144m",
-  whiteBg: "\x1b[48;2;255;255;255m",
-  gold: "\x1b[38;2;255;215;0m",
-  cyan: "\x1b[38;2;0;255;255m",
+const HEX = {
+  white: "#ffffff",
+  violetRed: "#d02090",
+  gold: "#ffd700",
+  cyan: "#00ffff",
 };
 
-function print(text) {
-  apiRef.output.print(text);
+function print(content) {
+  apiRef.output.print(content);
 }
 
 function clean(text) {
@@ -22,49 +18,48 @@ function clean(text) {
     .trim();
 }
 
+function withBackground(foregroundState, bgHex) {
+  return {
+    ...foregroundState,
+    background: { space: "hex", color: bgHex },
+  };
+}
+
 function printStunned(target) {
   const name = clean(target).toUpperCase();
+  if (!name) return;
 
-  if (!name) {
-    return;
-  }
-
-  print(
-    "\n\n" +
-      "\t\t\t" +
-      C.white +
-      C.violetRedBg +
-      " OGLUSZYLES " +
-      C.reset +
-      C.violetRed +
-      C.whiteBg +
-      " " +
-      name +
-      " " +
-      C.reset +
-      "\n\n",
+  const labelStyle = withBackground(
+    apiRef.colors.fromHex(HEX.white),
+    HEX.violetRed,
   );
+  const nameStyle = withBackground(
+    apiRef.colors.fromHex(HEX.violetRed),
+    HEX.white,
+  );
+
+  const buffer = new apiRef.AnsiAwareBuffer(
+    "\n\n\t\t\t OGLUSZYLES ",
+    labelStyle,
+  );
+  buffer.append(` ${name} `, nameStyle);
+  buffer.append("\n\n");
+
+  print(buffer);
 }
 
 function printRecovered(target) {
   const name = clean(target);
+  if (!name) return;
 
-  if (!name) {
-    return;
-  }
-
-  print(
-    "\n" +
-      "\t\t" +
-      C.gold +
-      name +
-      C.reset +
-      " " +
-      C.cyan +
-      "dochodzi do siebie" +
-      C.reset +
-      "\n\n",
+  const buffer = new apiRef.AnsiAwareBuffer(
+    "\n\t\t" + name,
+    apiRef.colors.fromHex(HEX.gold),
   );
+  buffer.append(" dochodzi do siebie", apiRef.colors.fromHex(HEX.cyan));
+  buffer.append("\n\n");
+
+  print(buffer);
 }
 
 export async function init(api) {
@@ -74,7 +69,6 @@ export async function init(api) {
     /.* walisz (.*) na odlew .* Nieprzyjemne chrzakniecie i metny wzrok przeciwnika swiadcza, ze dobrze wymierzony cios musial trafic w jakies wrazliwe miejsce\./i,
     (line, matches) => {
       printStunned(matches[1]);
-
       return line;
     },
     TAG,
@@ -84,7 +78,6 @@ export async function init(api) {
     /^([a-zA-Z ]+) powoli dochodzi do siebie\.$/i,
     (line, matches) => {
       printRecovered(matches[1]);
-
       return null;
     },
     TAG,
@@ -92,7 +85,7 @@ export async function init(api) {
 
   return {
     name: "stun-highlighter",
-    version: "1.0.0",
+    version: "1.0.1",
     author: "ctarx",
     description: "Highlights stun and stun recovery messages.",
   };
@@ -106,6 +99,5 @@ export async function destroy() {
   ) {
     apiRef.triggers.removeByTag(TAG);
   }
-
   apiRef = null;
 }
