@@ -74,7 +74,7 @@ export async function init(api) {
 
   return {
     name: "stun-highlighter",
-    version: "1.0.0",
+    version: "1.0.1",
     author: "ctarx",
     description: "Highlights stun and stun recovery messages.",
   };
