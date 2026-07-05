@@ -1,5 +1,3 @@
-// gnome-speech.js
-
 const PLUGIN_NAME = "Gnome Speech";
 const VERSION = "1.0.0";
 const STORAGE_KEY = "plugin:gnomeSpeech:enabled";
@@ -136,7 +134,7 @@ export async function init(api) {
   return {
     name: PLUGIN_NAME,
     version: VERSION,
-    author: "",
+    author: "ctarx",
     description: "Adds gnome speech by converting spoken text into CamelCase.",
   };
 }
