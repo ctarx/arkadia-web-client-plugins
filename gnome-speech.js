@@ -1,5 +1,5 @@
 const PLUGIN_NAME = "Gnome Speech";
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const STORAGE_KEY = "plugin:gnomeSpeech:enabled";
 
 let apiRef = null;
@@ -8,7 +8,9 @@ let aliasIds = [];
 let settingsListener = null;
 
 let enabled = false;
+let currentLang = "potoczna";
 let languageAdjective = "";
+let languageAdjectives = new Set();
 
 function readEnabled() {
   try {
@@ -38,16 +40,48 @@ function setEnabled(api, value) {
   api.output.print(`[${PLUGIN_NAME}] ${enabled ? "on" : "off"}`);
 }
 
-function toGnomeSpeech(text) {
-  const words = String(text).match(/[\p{L}\p{N}]+/gu) || [];
+function normalizeWord(word) {
+  return String(word || "")
+    .trim()
+    .toLocaleLowerCase("pl-PL");
+}
 
-  return words
-    .map((word) => {
-      const first = word.slice(0, 1).toLocaleUpperCase("pl-PL");
-      const rest = word.slice(1);
-      return first + rest;
-    })
-    .join("");
+function capitalizeWord(word) {
+  if (!word) {
+    return "";
+  }
+
+  const first = word.slice(0, 1).toLocaleUpperCase("pl-PL");
+  const rest = word.slice(1);
+  return first + rest;
+}
+
+function camelCaseText(text) {
+  const words = String(text).match(/[\p{L}\p{N}]+/gu) || [];
+  return words.map(capitalizeWord).join("");
+}
+
+function transformSayText(text) {
+  const trimmed = String(text || "").trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const match = trimmed.match(/^(\S+)\s+(.+)$/);
+
+  if (!match) {
+    return camelCaseText(trimmed);
+  }
+
+  const firstWord = match[1];
+  const rest = match[2];
+
+  if (languageAdjectives.has(normalizeWord(firstWord))) {
+    return `${firstWord} ${camelCaseText(rest)}`;
+  }
+
+  return camelCaseText(trimmed);
 }
 
 function transformSpeechCommand(command) {
@@ -55,16 +89,22 @@ function transformSpeechCommand(command) {
     return undefined;
   }
 
-  const apostropheMatch = command.match(/^'(?!')(.*)$/);
+  const apostropheMatch = command.match(/^'(?!')(.+)$/);
 
   if (apostropheMatch) {
-    const msg = apostropheMatch[1] || "";
+    const msg = apostropheMatch[1];
 
     if (!msg.trim()) {
       return undefined;
     }
 
-    return "'" + toGnomeSpeech(msg);
+    // When language or adverb is configured, the built-in language script will
+    // convert this into ppowiedz/jppowiedz. We transform that final command instead.
+    if (currentLang !== "potoczna" || languageAdjective.trim()) {
+      return undefined;
+    }
+
+    return "'" + camelCaseText(msg);
   }
 
   const sayMatch = command.match(/^(ppowiedz|jppowiedz)\s+(.+)$/);
@@ -72,14 +112,12 @@ function transformSpeechCommand(command) {
   if (sayMatch) {
     const verb = sayMatch[1];
     const rest = sayMatch[2];
-    const adj = languageAdjective.trim();
 
-    if (adj && rest.startsWith(adj + " ")) {
-      const msg = rest.slice(adj.length + 1);
-      return `${verb} ${adj} ${toGnomeSpeech(msg)}`;
+    if (!rest.trim()) {
+      return undefined;
     }
 
-    return `${verb} ${toGnomeSpeech(rest)}`;
+    return `${verb} ${transformSayText(rest)}`;
   }
 
   return undefined;
@@ -88,9 +126,29 @@ function transformSpeechCommand(command) {
 async function refreshLanguageSettings(api) {
   try {
     const settings = await api.settings.getCharacterSettings();
+
+    currentLang = String(settings?.language || "potoczna");
     languageAdjective = String(settings?.languageAdjective || "").trim();
+
+    const adjectives = new Set();
+
+    if (languageAdjective) {
+      adjectives.add(normalizeWord(languageAdjective));
+    }
+
+    for (const item of settings?.languageAliases || []) {
+      const adj = String(item?.adjective || "").trim();
+
+      if (adj) {
+        adjectives.add(normalizeWord(adj));
+      }
+    }
+
+    languageAdjectives = adjectives;
   } catch {
+    currentLang = "potoczna";
     languageAdjective = "";
+    languageAdjectives = new Set();
   }
 }
 
