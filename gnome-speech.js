@@ -1,6 +1,12 @@
 const TAG = "gnome-speech";
 const STORAGE_KEY = "gnome-speech:enabled";
 
+const ANSI = {
+  reset: "\x1b[0m",
+  green: "\x1b[38;2;122;246;1m",
+  red: "\x1b[38;2;249;97;70m",
+};
+
 let apiRef = null;
 let hookId = null;
 let aliasIds = [];
@@ -29,14 +35,27 @@ function saveEnabled(value) {
   }
 }
 
+function getStatusColor() {
+  return enabled ? ANSI.green : ANSI.red;
+}
+
+function getStatusText() {
+  return enabled ? "on" : "off";
+}
+
 function printHelp(api) {
   api.output.print(`[${TAG}] Usage: /gnome on | /gnome off`);
-  api.output.print(`[${TAG}] Status: ${enabled ? "on" : "off"}`);
+  api.output.print(
+    `[${TAG}] Status: ${getStatusColor()}${getStatusText()}${ANSI.reset}`,
+  );
 }
 
 function setEnabled(api, value) {
   saveEnabled(value);
-  api.output.print(`[${TAG}] ${enabled ? "on" : "off"}`);
+
+  api.output.print(
+    `[${TAG}] ${getStatusColor()}${getStatusText()}${ANSI.reset}`,
+  );
 }
 
 function normalizeWord(word) {
@@ -189,7 +208,7 @@ export async function init(api) {
 
   return {
     name: "gnome-speech",
-    version: "1.0.2",
+    version: "1.0.3",
     author: "ctarx",
     description: "Converts spoken text into gnome-style CamelCase.",
   };
