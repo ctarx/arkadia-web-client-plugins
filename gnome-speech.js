@@ -25,7 +25,7 @@ function saveEnabled(value) {
   try {
     localStorage.setItem(STORAGE_KEY, value ? "true" : "false");
   } catch {
-    // localStorage may be unavailable in some browser modes.
+    /* localStorage may be unavailable in some browser modes. */
   }
 }
 
