@@ -1,6 +1,5 @@
-const PLUGIN_NAME = "Gnome Speech";
-const VERSION = "1.0.1";
-const STORAGE_KEY = "plugin:gnomeSpeech:enabled";
+const TAG = "gnome-speech";
+const STORAGE_KEY = "gnome-speech:enabled";
 
 let apiRef = null;
 let hookId = null;
@@ -31,13 +30,13 @@ function saveEnabled(value) {
 }
 
 function printHelp(api) {
-  api.output.print(`[${PLUGIN_NAME}] Usage: /gnome on | /gnome off`);
-  api.output.print(`[${PLUGIN_NAME}] Status: ${enabled ? "on" : "off"}`);
+  api.output.print(`[${TAG}] Usage: /gnome on | /gnome off`);
+  api.output.print(`[${TAG}] Status: ${enabled ? "on" : "off"}`);
 }
 
 function setEnabled(api, value) {
   saveEnabled(value);
-  api.output.print(`[${PLUGIN_NAME}] ${enabled ? "on" : "off"}`);
+  api.output.print(`[${TAG}] ${enabled ? "on" : "off"}`);
 }
 
 function normalizeWord(word) {
@@ -53,6 +52,7 @@ function capitalizeWord(word) {
 
   const first = word.slice(0, 1).toLocaleUpperCase("pl-PL");
   const rest = word.slice(1);
+
   return first + rest;
 }
 
@@ -98,8 +98,6 @@ function transformSpeechCommand(command) {
       return undefined;
     }
 
-    // When language or adverb is configured, the built-in language script will
-    // convert this into ppowiedz/jppowiedz. We transform that final command instead.
     if (currentLang !== "potoczna" || languageAdjective.trim()) {
       return undefined;
     }
@@ -190,10 +188,10 @@ export async function init(api) {
   );
 
   return {
-    name: PLUGIN_NAME,
-    version: VERSION,
+    name: "gnome-speech",
+    version: "1.0.2",
     author: "ctarx",
-    description: "Adds gnome speech by converting spoken text into CamelCase.",
+    description: "Converts spoken text into gnome-style CamelCase.",
   };
 }
 
