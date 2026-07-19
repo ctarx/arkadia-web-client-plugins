@@ -11,15 +11,22 @@ let apiRef = null;
 let hookId = null;
 let aliasIds = [];
 let settingsListener = null;
+let characterListener = null;
 
 let enabled = false;
+let currentCharacter = "";
 let currentLang = "potoczna";
 let languageAdjective = "";
 let languageAdjectives = new Set();
 
+function getStorageKey() {
+  return currentCharacter ? `${currentCharacter}:${STORAGE_KEY}` : "";
+}
+
 function readEnabled() {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "true";
+    const key = getStorageKey();
+    return key ? localStorage.getItem(key) === "true" : false;
   } catch {
     return false;
   }
@@ -29,7 +36,11 @@ function saveEnabled(value) {
   enabled = value;
 
   try {
-    localStorage.setItem(STORAGE_KEY, value ? "true" : "false");
+    const key = getStorageKey();
+
+    if (key) {
+      localStorage.setItem(key, value ? "true" : "false");
+    }
   } catch {
     /* localStorage may be unavailable in some browser modes. */
   }
@@ -171,6 +182,17 @@ async function refreshLanguageSettings(api) {
 
 export async function init(api) {
   apiRef = api;
+
+  try {
+    currentCharacter = String(
+      api.gmcp.get()?.char?.info?.name ||
+        localStorage.getItem("currentCharacter") ||
+        "",
+    );
+  } catch {
+    currentCharacter = "";
+  }
+
   enabled = readEnabled();
 
   await refreshLanguageSettings(api);
@@ -180,6 +202,19 @@ export async function init(api) {
   };
 
   api.events.on("settings", settingsListener);
+
+  characterListener = (info) => {
+    const character = String(info?.name || "");
+
+    if (!character || character === currentCharacter) {
+      return;
+    }
+
+    currentCharacter = character;
+    enabled = readEnabled();
+  };
+
+  api.events.on("gmcp.char.info", characterListener);
 
   hookId = api.commandHooks.register((command) => {
     return transformSpeechCommand(command);
@@ -208,7 +243,7 @@ export async function init(api) {
 
   return {
     name: "gnome-speech",
-    version: "1.0.3",
+    version: "1.0.4",
     author: "ctarx",
     description: "Converts spoken text into gnome-style CamelCase.",
   };
@@ -235,5 +270,12 @@ export async function destroy() {
     settingsListener = null;
   }
 
+  if (characterListener) {
+    apiRef.events.off("gmcp.char.info", characterListener);
+    characterListener = null;
+  }
+
+  currentCharacter = "";
+  enabled = false;
   apiRef = null;
 }
