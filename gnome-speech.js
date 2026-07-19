@@ -51,6 +51,7 @@ export async function init(api) {
 
   const green = api.colors.fromHex("#00ff00");
   const red = api.colors.fromHex("#ff0000");
+  const tagColor = api.colors.fromHex("#cc7700");
 
   function onCharacter(info) {
     const name = String(info?.name || "");
@@ -67,10 +68,8 @@ export async function init(api) {
   }
 
   function printStatus() {
-    const buf = new api.AnsiAwareBuffer(`[${TAG}] `, green);
-    const label = enabled ? "ON" : "OFF";
-    const color = enabled ? green : red;
-    buf.append(label, color);
+    const buf = new api.AnsiAwareBuffer(`[${TAG}] `, tagColor);
+    buf.append(enabled ? "ON" : "OFF", enabled ? green : red);
     api.output.print(buf);
   }
 
