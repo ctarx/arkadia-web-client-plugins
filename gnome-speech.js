@@ -22,13 +22,17 @@ function saveEnabled(value) {
 
 function toCamelCase(text) {
   if (!text) return "";
-  const words = String(text).match(/[\p{L}\p{N}]+/gu) || [];
-  return words
+  const str = String(text);
+  const words = str.match(/[\p{L}\p{N}]+/gu) || [];
+  if (!words.length) return str;
+  const cameled = words
     .map((w) =>
       w.charAt(0).toLocaleUpperCase("pl-PL") +
       w.slice(1).toLocaleLowerCase("pl-PL"),
     )
     .join("");
+  const trailing = str.match(/[^\p{L}\p{N}]+$/u);
+  return cameled + (trailing ? trailing[0] : "");
 }
 
 function toggle() {
