@@ -2,10 +2,15 @@ const TAG = "gnome-speech";
 const STORAGE_KEY = "gnome-speech:enabled";
 
 let enabled = false;
+let currentCharacter = "";
+
+function getStorageKey() {
+  return currentCharacter ? `${currentCharacter}:${STORAGE_KEY}` : STORAGE_KEY;
+}
 
 function readEnabled() {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "true";
+    return localStorage.getItem(getStorageKey()) === "true";
   } catch {
     return false;
   }
@@ -14,7 +19,7 @@ function readEnabled() {
 function saveEnabled(value) {
   enabled = value;
   try {
-    localStorage.setItem(STORAGE_KEY, value ? "true" : "false");
+    localStorage.setItem(getStorageKey(), value ? "true" : "false");
   } catch {}
 }
 
@@ -34,10 +39,27 @@ function toCamelCase(text) {
 }
 
 export async function init(api) {
+  try {
+    currentCharacter = String(
+      api.gmcp.get()?.char?.info?.name || "",
+    );
+  } catch {
+    currentCharacter = "";
+  }
+
   enabled = readEnabled();
 
   const green = api.colors.fromHex("#00ff00");
   const red = api.colors.fromHex("#ff0000");
+
+  function onCharacter(info) {
+    const name = String(info?.name || "");
+    if (!name || name === currentCharacter) return;
+    currentCharacter = name;
+    enabled = readEnabled();
+  }
+
+  api.events.on("gmcp.char.info", onCharacter);
 
   function toggle() {
     enabled = !enabled;
@@ -95,4 +117,7 @@ export async function init(api) {
   };
 }
 
-export async function destroy() {}
+export async function destroy() {
+  currentCharacter = "";
+  enabled = false;
+}
