@@ -2,8 +2,6 @@ const TAG = "gnome-speech";
 const STORAGE_KEY = "gnome-speech:enabled";
 
 let enabled = false;
-let footerHandle = null;
-let menuEntryHandle = null;
 
 function readEnabled() {
   try {
@@ -35,42 +33,24 @@ function toCamelCase(text) {
   return cameled + (trailing ? trailing[0] : "");
 }
 
-function toggle() {
-  enabled = !enabled;
-  saveEnabled(enabled);
-  updateUI();
-}
-
-function updateUI() {
-  const color = enabled ? "#7afa01" : "#666";
-  const label = enabled ? "GNOME" : "gnome";
-
-  if (footerHandle) {
-    footerHandle.setContent(
-      `<span style="color:${color};cursor:pointer">${label}</span>`,
-    );
-  }
-
-  if (menuEntryHandle) {
-    menuEntryHandle.setLabel(`Gnome Speech: ${enabled ? "ON" : "OFF"}`);
-  }
-}
-
 export async function init(api) {
   enabled = readEnabled();
 
-  footerHandle = api.ui.registerFooterComponent(
-    "gnomeSpeech",
-    '<span style="cursor:pointer">gnome</span>',
-    "end",
-  );
-  footerHandle.element.addEventListener("click", toggle);
+  const green = api.colors.fromHex("#00ff00");
+  const red = api.colors.fromHex("#ff0000");
 
-  menuEntryHandle = api.ui.addPopupMenuEntry("Gnome Speech: OFF", () => {
-    toggle();
-  });
+  function toggle() {
+    enabled = !enabled;
+    saveEnabled(enabled);
+  }
 
-  updateUI();
+  function printStatus() {
+    const buf = new api.AnsiAwareBuffer(`[${TAG}] `, green);
+    const label = enabled ? "ON" : "OFF";
+    const color = enabled ? green : red;
+    buf.append(label, color);
+    api.output.print(buf);
+  }
 
   api.triggers.register(
     /^(Mowisz|Mowicie)(.*?: )(.*)$/,
@@ -91,21 +71,19 @@ export async function init(api) {
   );
 
   api.aliases.register(/^\/gnome$/, () => {
-    api.output.print(
-      `[${TAG}] /gnome on | /gnome off  (currently ${enabled ? "ON" : "OFF"})`,
-    );
+    printStatus();
     return true;
   });
 
   api.aliases.register(/^\/gnome\s+on$/i, () => {
     if (!enabled) toggle();
-    api.output.print(`[${TAG}] ON`);
+    printStatus();
     return true;
   });
 
   api.aliases.register(/^\/gnome\s+off$/i, () => {
     if (enabled) toggle();
-    api.output.print(`[${TAG}] off`);
+    printStatus();
     return true;
   });
 
