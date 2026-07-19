@@ -1,32 +1,13 @@
 const TAG = "gnome-speech";
 const STORAGE_KEY = "gnome-speech:enabled";
 
-const ANSI = {
-  reset: "\x1b[0m",
-  green: "\x1b[38;2;122;246;1m",
-  red: "\x1b[38;2;249;97;70m",
-};
-
-let apiRef = null;
-let hookId = null;
-let aliasIds = [];
-let settingsListener = null;
-let characterListener = null;
-
 let enabled = false;
-let currentCharacter = "";
-let currentLang = "potoczna";
-let languageAdjective = "";
-let languageAdjectives = new Set();
-
-function getStorageKey() {
-  return currentCharacter ? `${currentCharacter}:${STORAGE_KEY}` : "";
-}
+let footerHandle = null;
+let menuEntryHandle = null;
 
 function readEnabled() {
   try {
-    const key = getStorageKey();
-    return key ? localStorage.getItem(key) === "true" : false;
+    return localStorage.getItem(STORAGE_KEY) === "true";
   } catch {
     return false;
   }
@@ -34,250 +15,102 @@ function readEnabled() {
 
 function saveEnabled(value) {
   enabled = value;
-
   try {
-    const key = getStorageKey();
-
-    if (key) {
-      localStorage.setItem(key, value ? "true" : "false");
-    }
-  } catch {
-    /* localStorage may be unavailable in some browser modes. */
-  }
+    localStorage.setItem(STORAGE_KEY, value ? "true" : "false");
+  } catch {}
 }
 
-function getStatusColor() {
-  return enabled ? ANSI.green : ANSI.red;
-}
-
-function getStatusText() {
-  return enabled ? "on" : "off";
-}
-
-function printHelp(api) {
-  api.output.print(`[${TAG}] Usage: /gnome on | /gnome off`);
-  api.output.print(
-    `[${TAG}] Status: ${getStatusColor()}${getStatusText()}${ANSI.reset}`,
-  );
-}
-
-function setEnabled(api, value) {
-  saveEnabled(value);
-
-  api.output.print(
-    `[${TAG}] ${getStatusColor()}${getStatusText()}${ANSI.reset}`,
-  );
-}
-
-function normalizeWord(word) {
-  return String(word || "")
-    .trim()
-    .toLocaleLowerCase("pl-PL");
-}
-
-function capitalizeWord(word) {
-  if (!word) {
-    return "";
-  }
-
-  const first = word.slice(0, 1).toLocaleUpperCase("pl-PL");
-  const rest = word.slice(1);
-
-  return first + rest;
-}
-
-function camelCaseText(text) {
+function toCamelCase(text) {
+  if (!text) return "";
   const words = String(text).match(/[\p{L}\p{N}]+/gu) || [];
-  return words.map(capitalizeWord).join("");
+  return words
+    .map((w) =>
+      w.charAt(0).toLocaleUpperCase("pl-PL") +
+      w.slice(1).toLocaleLowerCase("pl-PL"),
+    )
+    .join("");
 }
 
-function transformSayText(text) {
-  const trimmed = String(text || "").trim();
-
-  if (!trimmed) {
-    return "";
-  }
-
-  const match = trimmed.match(/^(\S+)\s+(.+)$/);
-
-  if (!match) {
-    return camelCaseText(trimmed);
-  }
-
-  const firstWord = match[1];
-  const rest = match[2];
-
-  if (languageAdjectives.has(normalizeWord(firstWord))) {
-    return `${firstWord} ${camelCaseText(rest)}`;
-  }
-
-  return camelCaseText(trimmed);
+function toggle() {
+  enabled = !enabled;
+  saveEnabled(enabled);
+  updateUI();
 }
 
-function transformSpeechCommand(command) {
-  if (!enabled || !command || typeof command !== "string") {
-    return undefined;
+function updateUI() {
+  const color = enabled ? "#7afa01" : "#666";
+  const label = enabled ? "GNOME" : "gnome";
+
+  if (footerHandle) {
+    footerHandle.setContent(
+      `<span style="color:${color};cursor:pointer">${label}</span>`,
+    );
   }
 
-  const apostropheMatch = command.match(/^'(?!')(.+)$/);
-
-  if (apostropheMatch) {
-    const msg = apostropheMatch[1];
-
-    if (!msg.trim()) {
-      return undefined;
-    }
-
-    if (currentLang !== "potoczna" || languageAdjective.trim()) {
-      return undefined;
-    }
-
-    return "'" + camelCaseText(msg);
-  }
-
-  const sayMatch = command.match(/^(ppowiedz|jppowiedz)\s+(.+)$/);
-
-  if (sayMatch) {
-    const verb = sayMatch[1];
-    const rest = sayMatch[2];
-
-    if (!rest.trim()) {
-      return undefined;
-    }
-
-    return `${verb} ${transformSayText(rest)}`;
-  }
-
-  return undefined;
-}
-
-async function refreshLanguageSettings(api) {
-  try {
-    const settings = await api.settings.getCharacterSettings();
-
-    currentLang = String(settings?.language || "potoczna");
-    languageAdjective = String(settings?.languageAdjective || "").trim();
-
-    const adjectives = new Set();
-
-    if (languageAdjective) {
-      adjectives.add(normalizeWord(languageAdjective));
-    }
-
-    for (const item of settings?.languageAliases || []) {
-      const adj = String(item?.adjective || "").trim();
-
-      if (adj) {
-        adjectives.add(normalizeWord(adj));
-      }
-    }
-
-    languageAdjectives = adjectives;
-  } catch {
-    currentLang = "potoczna";
-    languageAdjective = "";
-    languageAdjectives = new Set();
+  if (menuEntryHandle) {
+    menuEntryHandle.setLabel(`Gnome Speech: ${enabled ? "ON" : "OFF"}`);
   }
 }
 
 export async function init(api) {
-  apiRef = api;
-
-  try {
-    currentCharacter = String(
-      api.gmcp.get()?.char?.info?.name ||
-        localStorage.getItem("currentCharacter") ||
-        "",
-    );
-  } catch {
-    currentCharacter = "";
-  }
-
   enabled = readEnabled();
 
-  await refreshLanguageSettings(api);
+  footerHandle = api.ui.registerFooterComponent(
+    "gnomeSpeech",
+    '<span style="cursor:pointer">gnome</span>',
+    "end",
+  );
+  footerHandle.element.addEventListener("click", toggle);
 
-  settingsListener = async () => {
-    await refreshLanguageSettings(api);
-  };
+  menuEntryHandle = api.ui.addPopupMenuEntry("Gnome Speech: OFF", () => {
+    toggle();
+  });
 
-  api.events.on("settings", settingsListener);
+  updateUI();
 
-  characterListener = async (info) => {
-    const character = String(info?.name || "");
+  api.triggers.register(
+    /^(Mowisz|Mowicie)(.*?: )(.*)$/,
+    (line, matches) => {
+      if (!enabled) return line;
 
-    if (!character || character === currentCharacter) {
-      return;
-    }
+      const prefixEnd = matches[1].length + matches[2].length;
+      const original = matches[3];
+      const converted = toCamelCase(original);
 
-    currentCharacter = character;
-    enabled = readEnabled();
+      if (converted === original) return line;
 
-    await refreshLanguageSettings(api);
-  };
-
-  api.events.on("gmcp.char.info", characterListener);
-
-  hookId = api.commandHooks.register((command) => {
-    return transformSpeechCommand(command);
-  }, 1000);
-
-  aliasIds.push(
-    api.aliases.register(/^\/gnome$/, () => {
-      printHelp(api);
-      return true;
-    }),
+      const state = line.getStateAt(prefixEnd);
+      line.replace([prefixEnd, line.text.length], converted, state);
+      return line;
+    },
+    TAG,
   );
 
-  aliasIds.push(
-    api.aliases.register(/^\/gnome\s+on$/i, () => {
-      setEnabled(api, true);
-      return true;
-    }),
-  );
+  api.aliases.register(/^\/gnome$/, () => {
+    api.output.print(
+      `[${TAG}] /gnome on | /gnome off  (currently ${enabled ? "ON" : "OFF"})`,
+    );
+    return true;
+  });
 
-  aliasIds.push(
-    api.aliases.register(/^\/gnome\s+off$/i, () => {
-      setEnabled(api, false);
-      return true;
-    }),
-  );
+  api.aliases.register(/^\/gnome\s+on$/i, () => {
+    if (!enabled) toggle();
+    api.output.print(`[${TAG}] ON`);
+    return true;
+  });
+
+  api.aliases.register(/^\/gnome\s+off$/i, () => {
+    if (enabled) toggle();
+    api.output.print(`[${TAG}] off`);
+    return true;
+  });
 
   return {
-    name: "gnome-speech",
+    name: "Gnome Speech",
     version: "1.0.5",
     author: "ctarx",
-    description: "Converts spoken text into gnome-style CamelCase.",
+    description: "Converts spoken text to gnome-style CamelCase in output",
   };
 }
 
-export async function destroy() {
-  if (!apiRef) {
-    return;
-  }
-
-  if (hookId) {
-    apiRef.commandHooks.unregister(hookId);
-    hookId = null;
-  }
-
-  for (const id of aliasIds) {
-    apiRef.aliases.remove(id);
-  }
-
-  aliasIds = [];
-
-  if (settingsListener) {
-    apiRef.events.off("settings", settingsListener);
-    settingsListener = null;
-  }
-
-  if (characterListener) {
-    apiRef.events.off("gmcp.char.info", characterListener);
-    characterListener = null;
-  }
-
-  currentCharacter = "";
-  enabled = false;
-  apiRef = null;
-}
+export async function destroy() {}
