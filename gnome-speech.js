@@ -203,7 +203,7 @@ export async function init(api) {
 
   api.events.on("settings", settingsListener);
 
-  characterListener = (info) => {
+  characterListener = async (info) => {
     const character = String(info?.name || "");
 
     if (!character || character === currentCharacter) {
@@ -212,6 +212,8 @@ export async function init(api) {
 
     currentCharacter = character;
     enabled = readEnabled();
+
+    await refreshLanguageSettings(api);
   };
 
   api.events.on("gmcp.char.info", characterListener);
@@ -243,7 +245,7 @@ export async function init(api) {
 
   return {
     name: "gnome-speech",
-    version: "1.0.4",
+    version: "1.0.5",
     author: "ctarx",
     description: "Converts spoken text into gnome-style CamelCase.",
   };
