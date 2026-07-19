@@ -51,7 +51,7 @@ export async function init(api) {
 
   const green = api.colors.fromHex("#00ff00");
   const red = api.colors.fromHex("#ff0000");
-  const tagColor = api.colors.fromHex("#cc7700");
+  const tagColor = api.colors.fromHex("#ff6347");
 
   function onCharacter(info) {
     const name = String(info?.name || "");
